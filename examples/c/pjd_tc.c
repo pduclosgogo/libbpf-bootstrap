@@ -30,21 +30,21 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 }
 
 static void print_tc_hook(struct bpf_tc_hook *ptr) {
-	fprintf(stderr, "sz: %d, ifindex: %d, attach_point: %d, parent:%d\n", (int)ptr->sz,
+	fprintf(stderr, "hook: sz: %d, ifindex: %d, attach_point: %d, parent:%d\n", (int)ptr->sz,
 		ptr->ifindex, (int)ptr->attach_point, (int)ptr->parent);
 }
 
 static void print_tc_opts(struct bpf_tc_opts *ptr) {
-	fprintf(stderr, "sz:%d, prog_fd:%d, flags:%lx, prog_id:%ld, handle:%ld, priority:%ld\n",
-	(int)ptr->sz, (int)ptr->prog_fd, ptr->flags, ptr->prog_id, ptr->handle, ptr->priority);
+	fprintf(stderr, "opts: sz:%d, prog_fd:%d, flags:%lx, prog_id:%ld, handle:%ld, priority:%ld, sizeof:%ld\n",
+	(int)ptr->sz, (int)ptr->prog_fd, ptr->flags, ptr->prog_id, ptr->handle, ptr->priority, sizeof(struct bpf_tc_opts));
 }
 
 __u32 map_ctx = 0;
 
 long map_callback(struct bpf_map *map, const void *key, void *value, void *ctx) {
 	struct endp_info *endp = value;
-	printf("src ip %lx, dst ip %lx, in bytes %ld, out bytes %ld", endp->src_ip,
-		endp->dst_ip, endp->in_count, endp->out_count);
+	printf("inside ip %lx, outside ip %lx, in bytes %ld, out bytes %ld", endp->inside_ip,
+		endp->outside_ip, endp->in_count, endp->out_count);
 	return 0;
 }
 
@@ -52,27 +52,24 @@ int main(int argc, char **argv)
 {
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_i_hook, .ifindex = LO_IFINDEX,
 			    .attach_point = BPF_TC_INGRESS);
-/*
+
 	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts, .handle = 1, .priority = 1);
-*/
+
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_e_hook, .ifindex = LO_IFINDEX,
 			    .attach_point = BPF_TC_EGRESS);
+
 	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_e_opts, .handle = 2, .priority = 1);
 
 
-	struct bpf_tc_opts *tc_i_opts = calloc(1, sizeof(struct bpf_tc_opts));
-/*
-	tc_i_opts->sz = sizeof(struct bpf_tc_opts);
-	tc_i_opts->handle = 1;
-	tc_i_opts->priority = 1;
-*/
+	// struct bpf_tc_opts *tc_i_opts = calloc(1, sizeof(struct bpf_tc_opts) + 8);
 
-	bool i_hook_created = false;
-	bool e_hook_created = false;
 	struct pjd_tc_bpf *skel;
 	int err;
 
 	libbpf_set_print(libbpf_print_fn);
+/*
+	bool i_hook_created = false;
+	bool e_hook_created = false;
 
 	// Find the interface IFACE
 	unsigned int if_idx = if_nametoindex(IFACE);
@@ -85,6 +82,7 @@ int main(int argc, char **argv)
 	// Set the discovered ifindex in tc_i_hook and tc_e_hook...
 	tc_i_hook.ifindex = if_idx;
 	tc_e_hook.ifindex = if_idx;
+*/
 
 	skel = pjd_tc_bpf__open_and_load();
 	if (!skel) {
@@ -99,27 +97,34 @@ int main(int argc, char **argv)
 	 *      there may be an egress filter on the qdisc
 	 */
 	err = bpf_tc_hook_create(&tc_i_hook);
-	if (!err)
-		i_hook_created = true;
+	//if (!err)
+	//	i_hook_created = true;
 	if (err && err != -EEXIST) {
 		fprintf(stderr, "Failed to create ingress TC hook: %d\n", err);
 		goto cleanup;
 	}
 
-	tc_i_opts->prog_fd = bpf_program__fd(skel->progs.tc_ingress);
-
 	print_tc_hook(&tc_i_hook);
-	print_tc_opts(tc_i_opts);
+	print_tc_opts(&tc_i_opts);
 
-	err = bpf_tc_attach(&tc_i_hook, tc_i_opts);
+	// tc_i_opts.sz = sizeof(struct bpf_tc_opts);
+	// tc_i_opts.prog_fd = bpf_program__fd(skel->progs.tc_ingress);
+
+	err = bpf_tc_attach(&tc_i_hook, &tc_i_opts);
 	if (err) {
 		fprintf(stderr, "Failed to attach ingress TC: %d\n", err);
 		goto cleanup;
 	}
 
+	// tc_i_opts->flags = BPF_TC_F_REPLACE;
+	// tc_i_opts.handle = 1;
+	// tc_i_opts.priority = 1;
+
 	err = bpf_tc_hook_create(&tc_e_hook);
+/*
 	if (!err)
 		e_hook_created = true;
+*/
 	if (err && err != -EEXIST) {
 		fprintf(stderr, "Failed to create egress TC hook: %d\n", err);
 		goto cleanup;
@@ -158,28 +163,30 @@ int main(int argc, char **argv)
 		}
 	}
 
-	tc_i_opts->flags = tc_i_opts->prog_fd = tc_i_opts->prog_id = 0;
-	err = bpf_tc_detach(&tc_i_hook, tc_i_opts);
+	err = bpf_tc_detach(&tc_i_hook, &tc_i_opts);
 	if (err) {
 		fprintf(stderr, "Failed to detach TC: %d\n", err);
 		goto cleanup;
 	}
+	tc_i_opts.flags = tc_i_opts.prog_fd = 0;
 
-	tc_e_opts.flags = tc_e_opts.prog_fd = tc_e_opts.prog_id = 0;
 	err = bpf_tc_detach(&tc_e_hook, &tc_e_opts);
 	if (err) {
 		fprintf(stderr, "Failed to detach TC: %d\n", err);
 		goto cleanup;
 	}
+	tc_e_opts.flags = tc_e_opts.prog_fd = tc_e_opts.prog_id = 0;
 
 
 cleanup:
-	if (i_hook_created) {
+	//if (i_hook_created) {
 		bpf_tc_hook_destroy(&tc_i_hook);
-	}
-	if (e_hook_created) {
+	//}
+	//if (e_hook_created) {
 		bpf_tc_hook_destroy(&tc_e_hook);
-	}
+	//}
+	close(tc_i_opts.prog_fd);
 	pjd_tc_bpf__destroy(skel);
+
 	return -err;
 }
