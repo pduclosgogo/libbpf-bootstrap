@@ -37,7 +37,7 @@ static inline int ip_is_fragment(struct __sk_buff *skb, __u32 nhoff)
 }
 
 SEC("tc")
-int tc_ingress(struct __sk_buff *ctx)
+int pjd_tc_ingress(struct __sk_buff *ctx)
 {
     void *data_end = (void *)(__u64)ctx->data_end;
     void *data = (void *)(__u64)ctx->data;
@@ -67,20 +67,22 @@ int tc_ingress(struct __sk_buff *ctx)
 
     infop = bpf_map_lookup_elem(&endp_info_buf, &tmp32);
     if (infop) {
+/*
         if (infop->outside_ip != tmp32) {
-            bpf_printk("tc_ingress: Mismatch between key %lx and outside_ip %lx", tmp32, infop->outside_ip);   // DEBUG
+            bpf_printk("pjd_tc_ingress: Mismatch between key %lx and outside_ip %lx", tmp32, infop->outside_ip);   // DEBUG
             return TC_ACT_OK;
         }
+*/
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, daddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         infop->inside_ip = tmp32;
         infop->in_count += bpf_ntohs(l3->tot_len);
-        bpf_printk("tc_ingress: Found %p for %lx", infop, tmp32);   // DEBUG
+        bpf_printk("pjd_tc_ingress: Found %p for %lx", infop, tmp32);   // DEBUG
     } else {
         struct endp_info init_val = {tmp32, 0, 0, 0};
-        bpf_printk("tc_ingress: No map found for %lx", tmp32);  // DEBUG
+        bpf_printk("pjd_tc_ingress: No map found for %lx", tmp32);  // DEBUG
 /*
-        init_val.outside = tmp32;
+        init_val.outside_ip = tmp32;
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, daddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         init_val.inside_ip = tmp32;
@@ -91,12 +93,12 @@ int tc_ingress(struct __sk_buff *ctx)
         return TC_ACT_OK;
     }
 
-    bpf_printk("tc_ingress: Got IP packet: tot_len: %d, ttl: %d", bpf_ntohs(l3->tot_len), l3->ttl);
+    bpf_printk("pjd_tc_ingress: Got IP packet: tot_len: %d, ttl: %d", bpf_ntohs(l3->tot_len), l3->ttl);
     return TC_ACT_OK;
 }
 
 SEC("tc")
-int tc_egress(struct __sk_buff *ctx)
+int pjd_tc_egress(struct __sk_buff *ctx)
 {
     void *data_end = (void *)(__u64)ctx->data_end;
     void *data = (void *)(__u64)ctx->data;
@@ -128,19 +130,19 @@ int tc_egress(struct __sk_buff *ctx)
     infop = bpf_map_lookup_elem(&endp_info_buf, &tmp32);
     if (infop) {
         if (infop->outside_ip != tmp32) {
-            bpf_printk("tc_egress: Mismatch between key %lx and outside_ip %lx", tmp32, infop->outside_ip);   // DEBUG
+            bpf_printk("pjd_tc_egress: Mismatch between key %lx and outside_ip %lx", tmp32, infop->outside_ip);   // DEBUG
             return TC_ACT_OK;
         }
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, saddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         infop->inside_ip = tmp32;
         infop->out_count += bpf_ntohs(l3->tot_len);
-        bpf_printk("tc_egress: Found %p for %lx, count", infop, tmp32); // DEBUG
+        bpf_printk("pjd_tc_egress: Found %p for %lx, count", infop, tmp32); // DEBUG
     } else {
         struct endp_info init_val = {tmp32, 0, 0, 0};
-        bpf_printk("tc_egress: No map found for %lx", tmp32);   // DEBUG
-/*
+        bpf_printk("pjd_tc_egress: No map found for %lx", tmp32);   // DEBUG
         init_val.inside_ip = tmp32;
+/*
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, saddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         init_val.inside_ip = tmp32;
@@ -151,7 +153,7 @@ int tc_egress(struct __sk_buff *ctx)
         return TC_ACT_OK;
     }
 
-    bpf_printk("tc_egress: Got IP packet: tot_len: %d, ttl: %d", bpf_ntohs(l3->tot_len), l3->ttl);
+    bpf_printk("pjd_tc_egress: Got IP packet: tot_len: %d, ttl: %d", bpf_ntohs(l3->tot_len), l3->ttl);
     return TC_ACT_OK;
 }
 

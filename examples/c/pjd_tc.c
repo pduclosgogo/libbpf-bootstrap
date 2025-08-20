@@ -53,24 +53,22 @@ int main(int argc, char **argv)
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_i_hook, .ifindex = LO_IFINDEX,
 			    .attach_point = BPF_TC_INGRESS);
 
-	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts, .handle = 1, .priority = 1);
+	// DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts, .priority = 1);
+	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts);
 
+/*
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_e_hook, .ifindex = LO_IFINDEX,
 			    .attach_point = BPF_TC_EGRESS);
 
 	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_e_opts, .handle = 2, .priority = 1);
-
-
-	// struct bpf_tc_opts *tc_i_opts = calloc(1, sizeof(struct bpf_tc_opts) + 8);
+*/
 
 	struct pjd_tc_bpf *skel;
 	int err;
 
 	libbpf_set_print(libbpf_print_fn);
-/*
-	bool i_hook_created = false;
-	bool e_hook_created = false;
 
+/*
 	// Find the interface IFACE
 	unsigned int if_idx = if_nametoindex(IFACE);
         if (if_idx != 0) {
@@ -82,6 +80,8 @@ int main(int argc, char **argv)
 	// Set the discovered ifindex in tc_i_hook and tc_e_hook...
 	tc_i_hook.ifindex = if_idx;
 	tc_e_hook.ifindex = if_idx;
+	pjd_tc_bpf__attach()
+
 */
 
 	skel = pjd_tc_bpf__open_and_load();
@@ -97,8 +97,6 @@ int main(int argc, char **argv)
 	 *      there may be an egress filter on the qdisc
 	 */
 	err = bpf_tc_hook_create(&tc_i_hook);
-	//if (!err)
-	//	i_hook_created = true;
 	if (err && err != -EEXIST) {
 		fprintf(stderr, "Failed to create ingress TC hook: %d\n", err);
 		goto cleanup;
@@ -107,8 +105,8 @@ int main(int argc, char **argv)
 	print_tc_hook(&tc_i_hook);
 	print_tc_opts(&tc_i_opts);
 
-	// tc_i_opts.sz = sizeof(struct bpf_tc_opts);
-	// tc_i_opts.prog_fd = bpf_program__fd(skel->progs.tc_ingress);
+	tc_i_opts.prog_fd = bpf_program__fd(skel->progs.pjd_tc_ingress);
+	fprintf(stderr, "pjd_tc: ingress prog_fd: %d\n", tc_i_opts.prog_fd);
 
 	err = bpf_tc_attach(&tc_i_hook, &tc_i_opts);
 	if (err) {
@@ -116,26 +114,20 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	// tc_i_opts->flags = BPF_TC_F_REPLACE;
-	// tc_i_opts.handle = 1;
-	// tc_i_opts.priority = 1;
-
-	err = bpf_tc_hook_create(&tc_e_hook);
 /*
-	if (!err)
-		e_hook_created = true;
-*/
+	err = bpf_tc_hook_create(&tc_e_hook);
 	if (err && err != -EEXIST) {
 		fprintf(stderr, "Failed to create egress TC hook: %d\n", err);
 		goto cleanup;
 	}
 
-	tc_e_opts.prog_fd = bpf_program__fd(skel->progs.tc_egress);
+	tc_e_opts.prog_fd = bpf_program__fd(skel->progs.pjd_tc_egress);
 	err = bpf_tc_attach(&tc_e_hook, &tc_e_opts);
 	if (err) {
 		fprintf(stderr, "Failed to attach egress TC: %d\n", err);
 		goto cleanup;
 	}
+*/
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
 		err = errno;
@@ -159,8 +151,11 @@ int main(int argc, char **argv)
 			if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attrs, sizeof(attrs)) != 0) {
 				break;
 			}
+			fprintf(stderr, "key %x found\n", key);
 			sleep(1);
 		}
+	} else {
+		fprintf(stderr, "key %x NOT found\n", key);
 	}
 
 	err = bpf_tc_detach(&tc_i_hook, &tc_i_opts);
@@ -170,12 +165,14 @@ int main(int argc, char **argv)
 	}
 	tc_i_opts.flags = tc_i_opts.prog_fd = 0;
 
+/*
 	err = bpf_tc_detach(&tc_e_hook, &tc_e_opts);
 	if (err) {
 		fprintf(stderr, "Failed to detach TC: %d\n", err);
 		goto cleanup;
 	}
 	tc_e_opts.flags = tc_e_opts.prog_fd = tc_e_opts.prog_id = 0;
+*/
 
 
 cleanup:
@@ -183,7 +180,7 @@ cleanup:
 		bpf_tc_hook_destroy(&tc_i_hook);
 	//}
 	//if (e_hook_created) {
-		bpf_tc_hook_destroy(&tc_e_hook);
+//		bpf_tc_hook_destroy(&tc_e_hook);
 	//}
 	close(tc_i_opts.prog_fd);
 	pjd_tc_bpf__destroy(skel);
