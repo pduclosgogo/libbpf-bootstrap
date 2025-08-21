@@ -3,14 +3,13 @@
 
 #include <signal.h>
 #include <unistd.h>
-#include <net/if.h>
-#include <sys/syscall.h>
-#include <linux/bpf.h>
-
-// #include <bpf/bpf_helpers.h>
-
-#include "pjd_tc.h"
 #include "pjd_tc.skel.h"
+// #include "pjd_tc.h"
+
+// #include <linux/bpf.h>
+// #include <net/if.h>
+// #include <sys/syscall.h>
+// #include <bpf/bpf_helpers.h>
 
 #define LO_IFINDEX 1
 
@@ -29,6 +28,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
+/*
 static void print_tc_hook(struct bpf_tc_hook *ptr) {
 	fprintf(stderr, "hook: sz: %d, ifindex: %d, attach_point: %d, parent:%d\n", (int)ptr->sz,
 		ptr->ifindex, (int)ptr->attach_point, (int)ptr->parent);
@@ -39,22 +39,19 @@ static void print_tc_opts(struct bpf_tc_opts *ptr) {
 	(int)ptr->sz, (int)ptr->prog_fd, ptr->flags, ptr->prog_id, ptr->handle, ptr->priority, sizeof(struct bpf_tc_opts));
 }
 
-__u32 map_ctx = 0;
-
 long map_callback(struct bpf_map *map, const void *key, void *value, void *ctx) {
 	struct endp_info *endp = value;
 	printf("inside ip %lx, outside ip %lx, in bytes %ld, out bytes %ld", endp->inside_ip,
 		endp->outside_ip, endp->in_count, endp->out_count);
 	return 0;
 }
+*/
 
 int main(int argc, char **argv)
 {
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_i_hook, .ifindex = LO_IFINDEX,
 			    .attach_point = BPF_TC_INGRESS);
-
-	// DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts, .priority = 1);
-	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts);
+	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts, .handle = 1, .priority = 1);
 
 /*
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_e_hook, .ifindex = LO_IFINDEX,
@@ -63,6 +60,7 @@ int main(int argc, char **argv)
 	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_e_opts, .handle = 2, .priority = 1);
 */
 
+	bool hook_created = false;
 	struct pjd_tc_bpf *skel;
 	int err;
 
@@ -97,15 +95,20 @@ int main(int argc, char **argv)
 	 *      there may be an egress filter on the qdisc
 	 */
 	err = bpf_tc_hook_create(&tc_i_hook);
+	if (!err)
+		hook_created = true;
+
 	if (err && err != -EEXIST) {
 		fprintf(stderr, "Failed to create ingress TC hook: %d\n", err);
 		goto cleanup;
 	}
 
+/*
 	print_tc_hook(&tc_i_hook);
 	print_tc_opts(&tc_i_opts);
+*/
 
-	tc_i_opts.prog_fd = bpf_program__fd(skel->progs.pjd_tc_ingress);
+	tc_i_opts.prog_fd = bpf_program__fd(skel->progs.tc_ingress);
 	fprintf(stderr, "pjd_tc: ingress prog_fd: %d\n", tc_i_opts.prog_fd);
 
 	err = bpf_tc_attach(&tc_i_hook, &tc_i_opts);
@@ -138,8 +141,9 @@ int main(int argc, char **argv)
 	printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
 	       "to see output of the BPF program.\n");
 
-	unsigned int key = 0;
+	// unsigned int key = 0;
 
+/*
 	if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, 3, NULL, &key) != 0) {
 		while (!exiting) {
 			union bpf_attr attrs = {
@@ -157,6 +161,11 @@ int main(int argc, char **argv)
 	} else {
 		fprintf(stderr, "key %x NOT found\n", key);
 	}
+*/
+	while (!exiting) {
+                fprintf(stderr, ",");
+                sleep(1);
+        }
 
 	err = bpf_tc_detach(&tc_i_hook, &tc_i_opts);
 	if (err) {
@@ -176,14 +185,13 @@ int main(int argc, char **argv)
 
 
 cleanup:
-	//if (i_hook_created) {
+	if (hook_created) {
 		bpf_tc_hook_destroy(&tc_i_hook);
-	//}
+	}
+
 	//if (e_hook_created) {
 //		bpf_tc_hook_destroy(&tc_e_hook);
 	//}
-	close(tc_i_opts.prog_fd);
 	pjd_tc_bpf__destroy(skel);
-
 	return -err;
 }
