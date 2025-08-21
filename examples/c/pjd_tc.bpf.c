@@ -88,7 +88,7 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
         tmp32 = bpf_ntohl(tmp32);
         infop->inside_ip = tmp32;
         infop->in_count += bpf_ntohs(l3->tot_len);
-        bpf_printk("pjd_tc_ingress: Found %p for %lx", infop, tmp32);   // DEBUG
+        bpf_printk("pjd_tc_ingress: Found %p for %lx, in_count %d", infop, tmp32, infop->in_count);   // DEBUG
     } else {
         struct endp_info init_val = {tmp32, 0, 0, 0};
         bpf_printk("pjd_tc_ingress: No map found for %lx", tmp32);  // DEBUG
@@ -103,7 +103,7 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
         return TC_ACT_OK;
     }
 
-    bpf_printk("pjd_tc_ingress: Got IP packet: tot_len: %d, ttl: %d", bpf_ntohs(l3->tot_len), l3->ttl);
+    // bpf_printk("pjd_tc_ingress: Got IP packet: tot_len: %d, ttl: %d", bpf_ntohs(l3->tot_len), l3->ttl);
     return TC_ACT_OK;
 }
 
