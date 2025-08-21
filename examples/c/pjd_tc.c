@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 {
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_i_hook, .ifindex = LO_IFINDEX,
 			    .attach_point = BPF_TC_INGRESS);
-	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts, .handle = 1, .priority = 1);
+	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts, .handle = 1, .flags = BPF_TC_F_REPLACE, .priority = 1);
 
 /*
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_e_hook, .ifindex = LO_IFINDEX,

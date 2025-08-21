@@ -27,7 +27,6 @@ struct endp_info {
         __u32 out_count;
 };
 
-/*
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 256);
@@ -35,6 +34,7 @@ struct {
     __type(value, struct endp_info);
 } endp_info_buf SEC(".maps");
 
+/*
 static inline int ip_is_fragment(struct __sk_buff *skb, __u32 nhoff)
 {
     __u16 frag_off;
@@ -52,8 +52,8 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
     void *data = (void *)(__u64)ctx->data;
     struct ethhdr *l2;
     struct iphdr *l3;
-    // struct endp_info *infop;
-    // __u32 tmp32;
+    struct endp_info *infop;
+    __u32 tmp32;
 
     if (ctx->protocol != bpf_htons(ETH_P_IP))
         return TC_ACT_OK;
@@ -72,18 +72,18 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
     if ((void *)(l3 + 1) > data_end)
         return TC_ACT_OK;
 
-/*
     // map key is the EXTERNAL address
     bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, saddr), &tmp32, 4);
     tmp32 = bpf_ntohl(tmp32);
 
     infop = bpf_map_lookup_elem(&endp_info_buf, &tmp32);
     if (infop) {
+/*
         if (infop->outside_ip != tmp32) {
             bpf_printk("pjd_tc_ingress: Mismatch between key %lx and outside_ip %lx", tmp32, infop->outside_ip);   // DEBUG
             return TC_ACT_OK;
         }
-
+*/
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, daddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         infop->inside_ip = tmp32;
@@ -102,7 +102,6 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
         bpf_map_update_elem(&endp_info_buf, &tmp32, &init_val, BPF_ANY);
         return TC_ACT_OK;
     }
-*/
 
     bpf_printk("pjd_tc_ingress: Got IP packet: tot_len: %d, ttl: %d", bpf_ntohs(l3->tot_len), l3->ttl);
     return TC_ACT_OK;
