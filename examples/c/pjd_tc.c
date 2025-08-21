@@ -7,14 +7,22 @@
 // #include "pjd_tc.h"
 
 // #include <linux/bpf.h>
-// #include <net/if.h>
+#include <net/if.h>
 // #include <sys/syscall.h>
 // #include <bpf/bpf_helpers.h>
 
 #define LO_IFINDEX 1
+#define ETH_HLEN	14		/* Total octets in header.	 */
 
 // #define IFACE "WAN1IN"	// Apollo
 #define IFACE "enp1s0"		// Alma9
+
+struct endp_info {
+        __u32 inside_ip;
+        __u32 outside_ip;
+        __u32 in_count;
+        __u32 out_count;
+};
 
 static volatile sig_atomic_t exiting = 0;
 
@@ -35,17 +43,17 @@ static void print_tc_hook(struct bpf_tc_hook *ptr) {
 }
 
 static void print_tc_opts(struct bpf_tc_opts *ptr) {
-	fprintf(stderr, "opts: sz:%d, prog_fd:%d, flags:%lx, prog_id:%ld, handle:%ld, priority:%ld, sizeof:%ld\n",
+	fprintf(stderr, "opts: sz:%d, prog_fd:%d, flags:%x, prog_id:%d, handle:%d, priority:%d, sizeof:%ld\n",
 	(int)ptr->sz, (int)ptr->prog_fd, ptr->flags, ptr->prog_id, ptr->handle, ptr->priority, sizeof(struct bpf_tc_opts));
 }
+*/
 
 long map_callback(struct bpf_map *map, const void *key, void *value, void *ctx) {
 	struct endp_info *endp = value;
-	printf("inside ip %lx, outside ip %lx, in bytes %ld, out bytes %ld", endp->inside_ip,
+	printf("inside ip %x, outside ip %x, in bytes %d, out bytes %d", endp->inside_ip,
 		endp->outside_ip, endp->in_count, endp->out_count);
 	return 0;
 }
-*/
 
 int main(int argc, char **argv)
 {
@@ -66,7 +74,6 @@ int main(int argc, char **argv)
 
 	libbpf_set_print(libbpf_print_fn);
 
-/*
 	// Find the interface IFACE
 	unsigned int if_idx = if_nametoindex(IFACE);
         if (if_idx != 0) {
@@ -77,10 +84,6 @@ int main(int argc, char **argv)
 
 	// Set the discovered ifindex in tc_i_hook and tc_e_hook...
 	tc_i_hook.ifindex = if_idx;
-	tc_e_hook.ifindex = if_idx;
-	pjd_tc_bpf__attach()
-
-*/
 
 	skel = pjd_tc_bpf__open_and_load();
 	if (!skel) {
@@ -103,14 +106,7 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-/*
-	print_tc_hook(&tc_i_hook);
-	print_tc_opts(&tc_i_opts);
-*/
-
 	tc_i_opts.prog_fd = bpf_program__fd(skel->progs.pjd_tc_ingress);
-	fprintf(stderr, "pjd_tc: ingress prog_fd: %d\n", tc_i_opts.prog_fd);
-
 	err = bpf_tc_attach(&tc_i_hook, &tc_i_opts);
 	if (err) {
 		fprintf(stderr, "Failed to attach ingress TC: %d\n", err);
@@ -167,12 +163,12 @@ int main(int argc, char **argv)
                 sleep(1);
         }
 
+	tc_i_opts.flags = tc_i_opts.prog_fd = 0;
 	err = bpf_tc_detach(&tc_i_hook, &tc_i_opts);
 	if (err) {
 		fprintf(stderr, "Failed to detach TC: %d\n", err);
 		goto cleanup;
 	}
-	tc_i_opts.flags = tc_i_opts.prog_fd = 0;
 
 /*
 	err = bpf_tc_detach(&tc_e_hook, &tc_e_opts);

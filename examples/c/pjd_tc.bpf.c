@@ -15,6 +15,7 @@
 
 #define TC_ACT_OK 0
 #define ETH_P_IP  0x0800 /* Internet Protocol packet    */
+#define ETH_HLEN	14		/* Total octets in header.	 */
 
 #define IP_MF     0x2000
 #define IP_OFFSET 0x1FFF
@@ -26,6 +27,7 @@ struct endp_info {
         __u32 out_count;
 };
 
+/*
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 256);
@@ -41,6 +43,7 @@ static inline int ip_is_fragment(struct __sk_buff *skb, __u32 nhoff)
     frag_off = __bpf_ntohs(frag_off);
     return frag_off & (IP_MF | IP_OFFSET);
 }
+*/
 
 SEC("tc")
 int pjd_tc_ingress(struct __sk_buff *ctx)
