@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 	print_tc_opts(&tc_i_opts);
 */
 
-	tc_i_opts.prog_fd = bpf_program__fd(skel->progs.tc_ingress);
+	tc_i_opts.prog_fd = bpf_program__fd(skel->progs.pjd_tc_ingress);
 	fprintf(stderr, "pjd_tc: ingress prog_fd: %d\n", tc_i_opts.prog_fd);
 
 	err = bpf_tc_attach(&tc_i_hook, &tc_i_opts);

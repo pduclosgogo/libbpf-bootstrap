@@ -13,15 +13,19 @@
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_tracing.h>
 
-#include "pjd_tc.h"
-
 #define TC_ACT_OK 0
 #define ETH_P_IP  0x0800 /* Internet Protocol packet    */
 
 #define IP_MF     0x2000
 #define IP_OFFSET 0x1FFF
 
-/*
+struct endp_info {
+        __u32 inside_ip;
+        __u32 outside_ip;
+        __u32 in_count;
+        __u32 out_count;
+};
+
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 256);
@@ -37,10 +41,9 @@ static inline int ip_is_fragment(struct __sk_buff *skb, __u32 nhoff)
     frag_off = __bpf_ntohs(frag_off);
     return frag_off & (IP_MF | IP_OFFSET);
 }
-*/
 
 SEC("tc")
-int tc_ingress(struct __sk_buff *ctx)
+int pjd_tc_ingress(struct __sk_buff *ctx)
 {
     void *data_end = (void *)(__u64)ctx->data_end;
     void *data = (void *)(__u64)ctx->data;
