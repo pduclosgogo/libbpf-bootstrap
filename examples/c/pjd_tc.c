@@ -68,12 +68,10 @@ int main(int argc, char **argv)
 			    .attach_point = BPF_TC_INGRESS);
 	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_i_opts, .handle = 1, .flags = BPF_TC_F_REPLACE, .priority = 1);
 
-/*
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_e_hook, .ifindex = LO_IFINDEX,
 			    .attach_point = BPF_TC_EGRESS);
 
 	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_e_opts, .handle = 2, .priority = 1);
-*/
 
 	bool hook_created = false;
 	struct pjd_tc_bpf *skel;
@@ -120,7 +118,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-/*
 	err = bpf_tc_hook_create(&tc_e_hook);
 	if (err && err != -EEXIST) {
 		fprintf(stderr, "Failed to create egress TC hook: %d\n", err);
@@ -133,7 +130,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to attach egress TC: %d\n", err);
 		goto cleanup;
 	}
-*/
 
 	if (signal(SIGINT, sig_int) == SIG_ERR) {
 		err = errno;
@@ -152,7 +148,7 @@ int main(int argc, char **argv)
 	// if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, 3, NULL, &prev_key) != 0) {
 	if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, 3, NULL, &key) != 0) {
 		while (!exiting) {
-			sleep(2);
+			sleep(1);
 			union bpf_attr attrs = {
 			.map_fd = 3,
 			// .key = (unsigned long long)&prev_key,
@@ -183,12 +179,6 @@ int main(int argc, char **argv)
 			}
 		}
 	}
-/*
-	while (!exiting) {
-                fprintf(stderr, ",");
-                sleep(1);
-        }
-*/
 
 	tc_i_opts.flags = tc_i_opts.prog_fd = 0;
 	err = bpf_tc_detach(&tc_i_hook, &tc_i_opts);
@@ -197,24 +187,20 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-/*
 	err = bpf_tc_detach(&tc_e_hook, &tc_e_opts);
 	if (err) {
 		fprintf(stderr, "Failed to detach TC: %d\n", err);
 		goto cleanup;
 	}
 	tc_e_opts.flags = tc_e_opts.prog_fd = tc_e_opts.prog_id = 0;
-*/
 
 
 cleanup:
 	if (hook_created) {
 		bpf_tc_hook_destroy(&tc_i_hook);
+		bpf_tc_hook_destroy(&tc_e_hook);
 	}
 
-	//if (e_hook_created) {
-//		bpf_tc_hook_destroy(&tc_e_hook);
-	//}
 	pjd_tc_bpf__destroy(skel);
 	return -err;
 }

@@ -93,6 +93,7 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
         infop->inside_ip = tmp32;
         infop->in_count += bpf_ntohs(l3->tot_len);
         bpf_printk("pjd_tc_ingress: Found %p for %lx, in_count %d", infop, tmp32, infop->in_count);   // DEBUG
+        // bpf_map_update_elem(&endp_info_buf, &infop->outside_ip, &infop, BPF_ANY);
     } else {
         struct endp_info init_val = {tmp32, 0, 0, 0};
         bpf_printk("pjd_tc_ingress: No map found for %lx", tmp32);  // DEBUG
@@ -111,7 +112,6 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
     return TC_ACT_OK;
 }
 
-/*
 SEC("tc")
 int pjd_tc_egress(struct __sk_buff *ctx)
 {
@@ -124,10 +124,6 @@ int pjd_tc_egress(struct __sk_buff *ctx)
     struct endp_info init_val = {};
 
     if (ctx->protocol != bpf_htons(ETH_P_IP))
-        return TC_ACT_OK;
-
-    //
-    if (ip_is_fragment(ctx, ETH_HLEN))
         return TC_ACT_OK;
 
     l2 = data;
@@ -144,10 +140,6 @@ int pjd_tc_egress(struct __sk_buff *ctx)
 
     infop = bpf_map_lookup_elem(&endp_info_buf, &tmp32);
     if (infop) {
-        if (infop->outside_ip != tmp32) {
-            bpf_printk("pjd_tc_egress: Mismatch between key %lx and outside_ip %lx", tmp32, infop->outside_ip);   // DEBUG
-            return TC_ACT_OK;
-        }
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, saddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         infop->inside_ip = tmp32;
@@ -170,6 +162,6 @@ int pjd_tc_egress(struct __sk_buff *ctx)
     bpf_printk("pjd_tc_egress: Got IP packet: tot_len: %d, ttl: %d", bpf_ntohs(l3->tot_len), l3->ttl);
     return TC_ACT_OK;
 }
-*/
+
 
 char __license[] SEC("license") = "GPL";
