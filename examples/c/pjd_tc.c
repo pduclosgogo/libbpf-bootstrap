@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 /* Copyright (c) 2025 Gogo Business Aviation */
 
+#define __NR_bpf 321
+
 #include <signal.h>
 #include <unistd.h>
 #include "pjd_tc.skel.h"
@@ -137,9 +139,9 @@ int main(int argc, char **argv)
 	printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
 	       "to see output of the BPF program.\n");
 
-	// unsigned int key = 0;
+	unsigned int key = 0;
 
-/*
+	sleep(1);
 	if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, 3, NULL, &key) != 0) {
 		while (!exiting) {
 			union bpf_attr attrs = {
@@ -149,19 +151,20 @@ int main(int argc, char **argv)
 			};
 
 			if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attrs, sizeof(attrs)) != 0) {
-				break;
+				fprintf(stderr, "pjd_tc: nextkey %x NOT found\n", key);
 			}
-			fprintf(stderr, "key %x found\n", key);
+			fprintf(stderr, "pjd_tc: key %x found\n", key);
 			sleep(1);
 		}
 	} else {
-		fprintf(stderr, "key %x NOT found\n", key);
+		fprintf(stderr, "pjd_tc: key %x NOT found\n", key);
 	}
-*/
+/*
 	while (!exiting) {
                 fprintf(stderr, ",");
                 sleep(1);
         }
+*/
 
 	tc_i_opts.flags = tc_i_opts.prog_fd = 0;
 	err = bpf_tc_detach(&tc_i_hook, &tc_i_opts);
