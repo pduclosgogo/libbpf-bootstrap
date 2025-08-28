@@ -39,6 +39,11 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 }
 
 /*
+static void print_endp_info(struct endp_info *endp) {
+	printf("endp_infop %p: inside ip %x, outside ip %x, in bytes %d, out bytes %d", endp,
+		endp->inside_ip, endp->outside_ip, endp->in_count, endp->out_count);
+}
+
 static void print_tc_hook(struct bpf_tc_hook *ptr) {
 	fprintf(stderr, "hook: sz: %d, ifindex: %d, attach_point: %d, parent:%d\n", (int)ptr->sz,
 		ptr->ifindex, (int)ptr->attach_point, (int)ptr->parent);
@@ -139,25 +144,44 @@ int main(int argc, char **argv)
 	printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
 	       "to see output of the BPF program.\n");
 
-	unsigned int key = 0;
+	//unsigned int key, prev_key = 0;
+	unsigned int key;
+	// struct endp_info *endp = NULL;
 
 	sleep(1);
+	// if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, 3, NULL, &prev_key) != 0) {
 	if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, 3, NULL, &key) != 0) {
 		while (!exiting) {
+			sleep(1);
 			union bpf_attr attrs = {
 			.map_fd = 3,
+			// .key = (unsigned long long)&prev_key,
 			.key = (unsigned long long)&key,
 			.next_key = (unsigned long long)&key,
+			// .value = (long long unsigned int)&endp,
 			};
 
 			if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attrs, sizeof(attrs)) != 0) {
-				fprintf(stderr, "pjd_tc: nextkey %x NOT found\n", key);
+				fprintf(stderr, "pjd_tc: nextkey %x NOT found %d\n", key, errno);
+				// fprintf(stderr, "pjd_tc: prev_key %x or key %x NOT found %d\n", prev_key, key, errno);
+				key = 0;
+				continue;
 			}
+			// fprintf(stderr, "pjd_tc: prev_key %x, key %x found\n", prev_key, key);
 			fprintf(stderr, "pjd_tc: key %x found\n", key);
-			sleep(1);
+
+/*
+			endp = NULL;
+			if (syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attrs, sizeof(attrs)) != 0) {
+				fprintf(stderr, "pjd_tc: Element lookup failed: endp %p ", endp);
+				continue;
+			}
+			if (endp != NULL) {
+				print_endp_info(endp);
+			}
+			prev_key = key;
+*/
 		}
-	} else {
-		fprintf(stderr, "pjd_tc: key %x NOT found\n", key);
 	}
 /*
 	while (!exiting) {
