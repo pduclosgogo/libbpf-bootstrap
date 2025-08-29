@@ -89,6 +89,7 @@ int main(int argc, char **argv)
 
 	// Set the discovered ifindex in tc_i_hook and tc_e_hook...
 	tc_i_hook.ifindex = if_idx;
+	tc_e_hook.ifindex = if_idx;
 
 	skel = pjd_tc_bpf__open_and_load();
 	if (!skel) {
