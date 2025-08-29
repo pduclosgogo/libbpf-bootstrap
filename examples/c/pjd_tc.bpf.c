@@ -83,8 +83,6 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
         bpf_printk("pjd_tc_ingress: Found %p for %lx, in_count %d", infop, tmp32, infop->in_count);   // DEBUG
     } else {
         struct endp_info init_val = {tmp32, 0, 0, 0};
-        bpf_printk("pjd_tc_ingress: No map found for %lx", tmp32);  // DEBUG
-
         init_val.outside_ip = tmp32;
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, daddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
@@ -92,6 +90,7 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
         init_val.in_count += bpf_ntohs(l3->tot_len);
         tmp32 = init_val.outside_ip;
         bpf_map_update_elem(&endp_info_buf, &tmp32, &init_val, BPF_ANY);
+        bpf_printk("pjd_tc_ingress: No map found for %lx", init_val.outside_ip);  // DEBUG
         return TC_ACT_OK;
     }
 
@@ -133,15 +132,14 @@ int pjd_tc_egress(struct __sk_buff *ctx)
         bpf_printk("pjd_tc_egress: Found %p for %lx, out_count %d", infop, tmp32, infop->out_count); // DEBUG
     } else {
         struct endp_info init_val = {tmp32, 0, 0, 0};
-        bpf_printk("pjd_tc_egress: No map found for %lx", tmp32);   // DEBUG
         init_val.outside_ip = tmp32;
-
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, saddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         init_val.inside_ip = tmp32;
         init_val.out_count += bpf_ntohs(l3->tot_len);
         tmp32 = init_val.outside_ip;
         bpf_map_update_elem(&endp_info_buf, &tmp32, &init_val, BPF_ANY);
+        bpf_printk("pjd_tc_egress: No map found for %lx", init_val.outside_ip);   // DEBUG
         return TC_ACT_OK;
     }
 

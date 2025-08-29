@@ -70,7 +70,6 @@ int main(int argc, char **argv)
 
 	DECLARE_LIBBPF_OPTS(bpf_tc_hook, tc_e_hook, .ifindex = LO_IFINDEX,
 			    .attach_point = BPF_TC_EGRESS);
-
 	DECLARE_LIBBPF_OPTS(bpf_tc_opts, tc_e_opts, .handle = 2, .priority = 1);
 
 	bool hook_created = false;
@@ -141,43 +140,37 @@ int main(int argc, char **argv)
 	printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
 	       "to see output of the BPF program.\n");
 
-	//unsigned int key, prev_key = 0;
-	unsigned int key;
+	unsigned int key = 0;
 	struct endp_info *endp = NULL;
+	union bpf_attr attrs = {
+		.map_fd = 3,
+		.key = (unsigned long long)&key,
+		.next_key = (unsigned long long)&key,
+	};
+	union bpf_attr attrs2;
 
 	sleep(1);
-	// if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, 3, NULL, &prev_key) != 0) {
-	if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, 3, NULL, &key) != 0) {
-		while (!exiting) {
-			sleep(1);
-			union bpf_attr attrs = {
-			.map_fd = 3,
-			// .key = (unsigned long long)&prev_key,
-			.key = (unsigned long long)&key,
-			.next_key = (unsigned long long)&key,
-			// .value = (long long unsigned int)&endp,
-			};
-			union bpf_attr attrs2;
+	while (!exiting) {
+		sleep(1);
 
-			if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attrs, sizeof(attrs)) != 0) {
-				fprintf(stderr, "pjd_tc: nextkey %x NOT found %d\n", key, errno);
-				// fprintf(stderr, "pjd_tc: prev_key %x or key %x NOT found %d\n", prev_key, key, errno);
-				key = 0;
-				continue;
-			}
-			// fprintf(stderr, "pjd_tc: key %x found\n", key);
+		if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attrs, sizeof(attrs)) != 0) {
+			fprintf(stderr, "pjd_tc: nextkey %x NOT found %d\n", key, errno);
+			// fprintf(stderr, "pjd_tc: prev_key %x or key %x NOT found %d\n", prev_key, key, errno);
+			key = 0;
+			continue;
+		}
+		// fprintf(stderr, "pjd_tc: key %x found\n", key);
 
-			attrs2 = attrs;
-			attrs2.value = (long long unsigned int)&endp;
-			// endp = NULL;
-			if (syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attrs2, sizeof(attrs2)) != 0) {
-				fprintf(stderr, "pjd_tc: Element lookup failed: endp %p ", endp);
-				continue;
-			}
-			if (attrs2.value) {
-				// fprintf(stderr, "pjd_tc: value %llx found\n", attrs2.value);
-				print_endp_info((struct endp_info *)attrs2.value);
-			}
+		attrs2 = attrs;
+		attrs2.value = (long long unsigned int)&endp;
+		// endp = NULL;
+		if (syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attrs2, sizeof(attrs2)) != 0) {
+			fprintf(stderr, "pjd_tc: Element lookup failed: endp %p ", endp);
+			continue;
+		}
+		if (attrs2.value) {
+			// fprintf(stderr, "pjd_tc: value %llx found\n", attrs2.value);
+			print_endp_info((struct endp_info *)attrs2.value);
 		}
 	}
 
@@ -185,13 +178,11 @@ int main(int argc, char **argv)
 	err = bpf_tc_detach(&tc_i_hook, &tc_i_opts);
 	if (err) {
 		fprintf(stderr, "Failed to detach TC: %d\n", err);
-		goto cleanup;
 	}
 
 	err = bpf_tc_detach(&tc_e_hook, &tc_e_opts);
 	if (err) {
 		fprintf(stderr, "Failed to detach TC: %d\n", err);
-		goto cleanup;
 	}
 	tc_e_opts.flags = tc_e_opts.prog_fd = tc_e_opts.prog_id = 0;
 
