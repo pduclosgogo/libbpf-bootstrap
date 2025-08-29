@@ -163,7 +163,6 @@ int main(int argc, char **argv)
 
 		attrs2 = attrs;
 		attrs2.value = (long long unsigned int)&endp;
-		// endp = NULL;
 		if (syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attrs2, sizeof(attrs2)) != 0) {
 			fprintf(stderr, "pjd_tc: Element lookup failed: endp %p ", endp);
 			continue;
@@ -171,6 +170,8 @@ int main(int argc, char **argv)
 		if (attrs2.value) {
 			// fprintf(stderr, "pjd_tc: value %llx found\n", attrs2.value);
 			print_endp_info((struct endp_info *)attrs2.value);
+		} else {
+			fprintf(stderr, "pjd_tc: No value for endp %p\n", endp);
 		}
 	}
 
