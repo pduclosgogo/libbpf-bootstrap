@@ -21,9 +21,11 @@
 
 struct endp_info {
         __u32 inside_ip;
+        __u32 in_b_count;
+        __u32 in_p_count;
         __u32 outside_ip;
-        __u32 in_count;
-        __u32 out_count;
+        __u32 out_b_count;
+        __u32 out_p_count;
 };
 
 static volatile sig_atomic_t exiting = 0;
@@ -40,7 +42,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 static void print_endp_info(struct endp_info *endp) {
 	fprintf(stderr, "endp_infop %p: inside ip %x, outside ip %x, in bytes %d, out bytes %d\n", endp,
-		endp->inside_ip, endp->outside_ip, endp->in_count, endp->out_count);
+		endp->inside_ip, endp->outside_ip, endp->in_b_count, endp->out_b_count);
 }
 
 /*
@@ -58,7 +60,7 @@ static void print_tc_opts(struct bpf_tc_opts *ptr) {
 long map_callback(struct bpf_map *map, const void *key, void *value, void *ctx) {
 	struct endp_info *endp = value;
 	printf("inside ip %x, outside ip %x, in bytes %d, out bytes %d", endp->inside_ip,
-		endp->outside_ip, endp->in_count, endp->out_count);
+		endp->outside_ip, endp->in_b_count, endp->out_b_count);
 	return 0;
 }
 

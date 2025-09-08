@@ -26,9 +26,11 @@
 
 struct endp_info {
         __u32 inside_ip;
+        __u32 in_b_count;
+        __u32 in_p_count;
         __u32 outside_ip;
-        __u32 in_count;
-        __u32 out_count;
+        __u32 out_b_count;
+        __u32 out_p_count;
 };
 
 struct {
@@ -82,18 +84,23 @@ int pjd_tc_ingress(struct __sk_buff *ctx)
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, daddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         infop->inside_ip = tmp32;
-	if (infop->in_count == 0) {
-        	bpf_printk("pjd_tc_ingress: Found infop %p for inside_ip %lx, in_count %d",
-			infop, infop->inside_ip, infop->in_count);   // DEBUG
+	if (infop->in_b_count == 0) {
+        	bpf_printk("pjd_tc_ingress: Found infop %p for outside_ip %lx, in_b_count %d",
+			infop, infop->outside_ip, infop->in_b_count);   // DEBUG
+	} else if ((infop->in_p_count % 10) == 0) {
+        	bpf_printk("pjd_tc_ingress: Found infop %p for outside_ip %lx, in_b_count %d, in_p_count %d",
+			infop, infop->outside_ip, infop->in_b_count, infop->in_p_count);   // DEBUG
 	}
-        infop->in_count += bpf_ntohs(l3->tot_len);
+        infop->in_b_count += bpf_ntohs(l3->tot_len);
+        infop->in_p_count += 1;
     } else {
         struct endp_info init_val = {tmp32, 0, 0, 0};
         init_val.outside_ip = tmp32;
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, daddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         init_val.inside_ip = tmp32;
-        init_val.in_count += bpf_ntohs(l3->tot_len);
+        init_val.in_b_count += bpf_ntohs(l3->tot_len);
+        init_val.in_p_count = 1;
         tmp32 = init_val.outside_ip;
         bpf_map_update_elem(&endp_info_buf, &tmp32, &init_val, BPF_ANY);
         bpf_printk("pjd_tc_ingress: No map found for %lx", init_val.outside_ip);  // DEBUG
@@ -137,17 +144,22 @@ int pjd_tc_egress(struct __sk_buff *ctx)
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, saddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         infop->inside_ip = tmp32;
-	if (infop->out_count == 0) {
-        	bpf_printk("pjd_tc_egress: Found infop %p for outside_ip %lx, out_count %d", infop, tmp32, infop->out_count); // DEBUG
+	if (infop->out_b_count == 0) {
+        	bpf_printk("pjd_tc_egress: Found infop %p for inside_ip %lx, out_b_count %d", infop, tmp32, infop->out_b_count); // DEBUG
+	} else if ((infop->out_p_count % 10) == 0) {
+        	bpf_printk("pjd_tc_egress: Found infop %p for inside_ip %lx, out_b_count %d, out_p_count %d",
+			infop, tmp32, infop->out_b_count, infop->out_p_count); // DEBUG
 	}
-        infop->out_count += bpf_ntohs(l3->tot_len);
+        infop->out_b_count += bpf_ntohs(l3->tot_len);
+        infop->out_p_count += 1;
     } else {
         struct endp_info init_val = {tmp32, 0, 0, 0};
         init_val.outside_ip = tmp32;
         bpf_skb_load_bytes(ctx, ETH_HLEN + offsetof(struct iphdr, saddr), &tmp32, 4);
         tmp32 = bpf_ntohl(tmp32);
         init_val.inside_ip = tmp32;
-        init_val.out_count += bpf_ntohs(l3->tot_len);
+        init_val.out_b_count += bpf_ntohs(l3->tot_len);
+        init_val.out_p_count = 1;
         tmp32 = init_val.outside_ip;
         bpf_map_update_elem(&endp_info_buf, &tmp32, &init_val, BPF_ANY);
         bpf_printk("pjd_tc_egress: No map found for %lx", init_val.outside_ip);   // DEBUG
