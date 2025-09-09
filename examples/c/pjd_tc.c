@@ -153,11 +153,8 @@ int main(int argc, char **argv)
 
 	sleep(1);
 	while (!exiting) {
-		sleep(1);
-
 		if (syscall(__NR_bpf, BPF_MAP_GET_NEXT_KEY, &attrs, sizeof(attrs)) != 0) {
-			fprintf(stderr, "pjd_tc: nextkey %x NOT found %d\n", key, errno);
-			// fprintf(stderr, "pjd_tc: prev_key %x or key %x NOT found %d\n", prev_key, key, errno);
+			// fprintf(stderr, "pjd_tc: nextkey %x NOT found %d\n", key, errno);	// DEBUG
 			key = 0;
 			continue;
 		}
@@ -167,6 +164,7 @@ int main(int argc, char **argv)
 		attrs2.value = (long long unsigned int)&endp;
 		if (syscall(__NR_bpf, BPF_MAP_LOOKUP_ELEM, &attrs2, sizeof(attrs2)) != 0) {
 			fprintf(stderr, "pjd_tc: Element lookup failed: endp %p ", endp);
+			sleep(5);
 			continue;
 		}
 		if (attrs2.value) {
